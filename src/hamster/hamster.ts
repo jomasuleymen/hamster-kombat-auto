@@ -122,7 +122,8 @@ export class Hamster {
 			} else {
 				logger.info({
 					source: "account.upgradeItems",
-					message: `Nothing to update, balance: ${this.userData.balanceCoins}`,
+					message: `Nothing to update`,
+					balance: this.userData.balanceCoins,
 				});
 
 				return;
