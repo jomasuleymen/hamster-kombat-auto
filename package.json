@@ -1,0 +1,22 @@
+{
+	"name": "hamster-kombat",
+	"version": "1.0.0",
+	"description": "",
+	"main": "",
+	"scripts": {
+		"start": "ts-node src/main.ts"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"@types/jest": "^29.5.12",
+		"@types/node": "^20.14.2",
+		"axios": "^1.7.2",
+		"dotenv": "^16.4.5",
+		"toad-scheduler": "^3.0.1",
+		"tsc": "^2.0.4",
+		"tsconfig-paths": "^4.2.0",
+		"typescript": "^5.4.5"
+	}
+}
