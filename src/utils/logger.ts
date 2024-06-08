@@ -1,10 +1,20 @@
 import winston from "winston";
 
+class ActionFilterTransport extends winston.transports.File {
+	log(info: any, next: () => void) {
+		if (info.message && info.message.action && super.log) {
+			super.log(info, next);
+		} else {
+			next();
+		}
+	}
+}
+
 export const logger = winston.createLogger({
 	level: "info",
 	format: winston.format.combine(
 		winston.format.timestamp(),
-		winston.format.json({space: 2})
+		winston.format.json({ space: 2 })
 	),
 	transports: [
 		new winston.transports.File({
@@ -16,6 +26,11 @@ export const logger = winston.createLogger({
 			dirname: "logs",
 			filename: "error.log",
 			level: "error",
+		}),
+		new ActionFilterTransport({
+			dirname: "logs",
+			filename: "action.log",
+			level: "info",
 		}),
 	],
 });

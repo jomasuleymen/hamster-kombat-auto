@@ -38,7 +38,6 @@ async function clickerAutomation(account: Hamster) {
 				source: "clickerAutomationJob",
 				message: err.message,
 			});
-			break;
 		}
 	}
 }

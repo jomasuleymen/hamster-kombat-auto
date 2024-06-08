@@ -1,4 +1,4 @@
-import { ENDPOINT } from "src/constants/hamster-api.constant";
+import { ENDPOINT, ERR } from "src/constants/hamster-api.constant";
 import hamsterAxios from "src/utils/axios.instance";
 import { logger } from "src/utils/logger";
 import { sleep } from "src/utils/time.util";
@@ -100,27 +100,40 @@ export class Hamster {
 
 	async upgradeItems() {
 		while (true) {
-			const upgradeItem = this.sortedUpgrades.find((upgrade) => {
-				if (upgrade.cooldownSeconds > 0) return false;
-
-				return (
+			// find first available and profitable item
+			const upgradeItem = this.sortedUpgrades.find(
+				(upgrade) =>
 					upgrade.price > 0 &&
 					upgrade.profitPerHourDelta > 0 &&
-					upgrade.price < this.userData.balanceCoins &&
 					upgrade.isAvailable &&
 					!upgrade.isExpired
-				);
-			});
+			);
 
 			if (upgradeItem) {
+				// if optimal profitable item costs highest or on cooldown, just wait them.
+				if (
+					upgradeItem.price > this.userData.balanceCoins ||
+					upgradeItem.cooldownSeconds > 0
+				)
+					return;
+
 				try {
 					this.upgradeItem(upgradeItem);
+
+					logger.info({
+						source: "account.upgradeItems",
+						action: "upgrading",
+						upgrade: upgradeItem,
+					});
 				} catch (err) {
-					upgradeItem.isAvailable = true;
+					if (err.response?.data.message !== ERR.INSUFFICIENT_FUNDS) {
+						upgradeItem.isAvailable = false;
+					}
+
 					logger.error({
 						source: "account.upgradeItems",
 						message: err.message,
-						item: upgradeItem,
+						upgrade: upgradeItem,
 					});
 				} finally {
 					await sleep(3000);
@@ -128,7 +141,7 @@ export class Hamster {
 			} else {
 				logger.info({
 					source: "account.upgradeItems",
-					message: `Nothing to update`,
+					message: "Nothing to update",
 					balance: this.userData.balanceCoins,
 					profitPerHour: this.userData.earnPassivePerHour,
 				});
