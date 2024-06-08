@@ -2,6 +2,7 @@ import { ENDPOINT } from "src/constants/hamster-api.constant";
 import hamsterAxios from "src/utils/axios.instance";
 import { HamsterUserData, Upgrade } from "./hamster.type";
 import { sleep } from "src/utils/time.util";
+import { logger } from "src/utils/logger";
 
 export class Hamster {
 	userData: HamsterUserData;
@@ -78,8 +79,6 @@ export class Hamster {
 	}
 
 	private async upgradeItem(item: Upgrade) {
-		console.log("upgrading", item);
-
 		return await hamsterAxios
 			.post(ENDPOINT.UPGRADE, {
 				timestamp: Date.now(),
@@ -112,11 +111,20 @@ export class Hamster {
 					this.upgradeItem(upgradeItem);
 				} catch (err) {
 					upgradeItem.isAvailable = true;
+					logger.error({
+						source: "account.upgradeItems",
+						message: err.message,
+						item: upgradeItem,
+					});
 				} finally {
 					await sleep(3000);
 				}
 			} else {
-				console.log("Nothing to update, balance:", this.userData.balanceCoins);
+				logger.info({
+					source: "account.upgradeItems",
+					message: `Nothing to update, balance: ${this.userData.balanceCoins}`,
+				});
+
 				return;
 			}
 		}

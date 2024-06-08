@@ -17,6 +17,7 @@
 		"toad-scheduler": "^3.0.1",
 		"tsc": "^2.0.4",
 		"tsconfig-paths": "^4.2.0",
-		"typescript": "^5.4.5"
+		"typescript": "^5.4.5",
+		"winston": "^3.13.0"
 	}
 }
