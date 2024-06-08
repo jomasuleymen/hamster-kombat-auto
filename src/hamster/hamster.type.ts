@@ -2,6 +2,7 @@ export interface HamsterUserData {
 	balanceCoins: number;
 	earnPerTap: number;
 	maxTaps: number;
+	earnPassivePerHour: number;
 }
 
 export interface Upgrade {

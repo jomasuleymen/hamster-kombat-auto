@@ -1,8 +1,8 @@
 import { ENDPOINT } from "src/constants/hamster-api.constant";
 import hamsterAxios from "src/utils/axios.instance";
-import { HamsterUserData, Upgrade } from "./hamster.type";
-import { sleep } from "src/utils/time.util";
 import { logger } from "src/utils/logger";
+import { sleep } from "src/utils/time.util";
+import { HamsterUserData, Upgrade } from "./hamster.type";
 
 export class Hamster {
 	userData: HamsterUserData;
@@ -14,6 +14,16 @@ export class Hamster {
 			balanceCoins: 0,
 			earnPerTap: 0,
 			maxTaps: 0,
+			earnPassivePerHour: 0,
+		};
+	}
+
+	private setUserData(clickerUser: any) {
+		this.userData = {
+			balanceCoins: clickerUser.balanceCoins,
+			earnPerTap: clickerUser.earnPerTap,
+			maxTaps: clickerUser.maxTaps,
+			earnPassivePerHour: clickerUser.earnPassivePerHour,
 		};
 	}
 
@@ -23,16 +33,11 @@ export class Hamster {
 		});
 
 		const { clickerUser } = data;
-
-		this.userData = {
-			balanceCoins: clickerUser.balanceCoins,
-			earnPerTap: clickerUser.earnPerTap,
-			maxTaps: clickerUser.maxTaps,
-		};
+		this.setUserData(clickerUser);
 	}
 
-	private setUpgrades(upgrades: any) {
-		const newUpgrades: Upgrade[] = upgrades.map((upgrade: any) => {
+	private setUpgrades(upgradesForBuy: any) {
+		const newUpgrades: Upgrade[] = upgradesForBuy.map((upgrade: any) => {
 			return {
 				id: upgrade.id,
 				isAvailable: upgrade.isAvailable,
@@ -65,8 +70,8 @@ export class Hamster {
 	}
 
 	async completeTap() {
-		if (!this.userData) {
-			console.log("User data is null");
+		if (!this.userData || !this.userData.maxTaps || !this.userData.earnPerTap) {
+			return;
 		}
 
 		return await hamsterAxios
@@ -87,8 +92,9 @@ export class Hamster {
 			.then((data) => {
 				this.userData.balanceCoins -= item.price;
 
-				const { upgradesForBuy } = data.data;
+				const { upgradesForBuy, clickerUser } = data.data;
 				this.setUpgrades(upgradesForBuy);
+				this.setUserData(clickerUser);
 			});
 	}
 
@@ -124,6 +130,7 @@ export class Hamster {
 					source: "account.upgradeItems",
 					message: `Nothing to update`,
 					balance: this.userData.balanceCoins,
+					profitPerHour: this.userData.earnPassivePerHour,
 				});
 
 				return;
