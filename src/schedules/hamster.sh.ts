@@ -1,3 +1,4 @@
+import { SH_INTERVAL } from "src/constants/hamster-api.constant";
 import { Hamster } from "src/hamster/hamster";
 import { logger } from "src/utils/logger";
 import { sleep } from "src/utils/time.util";
@@ -25,7 +26,7 @@ async function upgraderAutomation(account: Hamster) {
 	}
 }
 
-async function clickerAutomation(account: Hamster) {
+async function tapAutomation(account: Hamster) {
 	const actions = [account.completeTap.bind(account)];
 
 	for (let action of actions) {
@@ -48,19 +49,20 @@ function upgraderAutomationJob(account: Hamster) {
 	const task = new Task("upgrader automation job", () =>
 		upgraderAutomation(account)
 	);
-	const job = new SimpleIntervalJob({ hours: 3, runImmediately: true }, task);
+	const job = new SimpleIntervalJob(
+		{ milliseconds: SH_INTERVAL.HAMSTER.UPGRADES, runImmediately: true },
+		task
+	);
 
 	return job;
 }
 
-function clickerAutomationJob(account: Hamster) {
-	logger.info("Starting clickerAutomationJob");
+function tapAutomationJob(account: Hamster) {
+	logger.info("Starting tapAutomationJob");
 
-	const task = new Task("clicker autmation job", () =>
-		clickerAutomation(account)
-	);
+	const task = new Task("tap automation job", () => tapAutomation(account));
 	const job = new SimpleIntervalJob(
-		{ minutes: 15, runImmediately: true },
+		{ milliseconds: SH_INTERVAL.HAMSTER.TAP, runImmediately: true },
 		task
 	);
 
@@ -69,5 +71,5 @@ function clickerAutomationJob(account: Hamster) {
 
 export const hamsterJobs = () => {
 	const account = new Hamster();
-	return [clickerAutomationJob(account), upgraderAutomationJob(account)];
+	return [tapAutomationJob(account), upgraderAutomationJob(account)];
 };

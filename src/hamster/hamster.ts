@@ -1,17 +1,18 @@
-import { ENDPOINT } from "src/constants/hamster-api.constant";
+import { Semaphore } from "async-mutex";
+import { ENDPOINT, SH_INTERVAL } from "src/constants/hamster-api.constant";
 import hamsterAxios from "src/utils/axios.instance";
 import { writeObjectToFile } from "src/utils/file.util";
 import { logger } from "src/utils/logger";
 import { addSecondsToDate, sleep } from "src/utils/time.util";
-import { HOUR, SECOND } from "time-constants";
+import { SECOND } from "time-constants";
 import { HamsterUserData, Upgrade, UpgradeResponse } from "./hamster.type";
 
 export class Hamster {
 	private synced: boolean;
-	private isUpgrading: boolean;
 
 	private userData: HamsterUserData;
 	private sortedUpgrades: Upgrade[];
+	private updateItemSemaphore: Semaphore;
 
 	constructor() {
 		this.sortedUpgrades = [];
@@ -22,15 +23,8 @@ export class Hamster {
 			maxTaps: 0,
 			earnPassivePerHour: 0,
 		};
-	}
 
-	private setUserData(clickerUser: any) {
-		this.userData = {
-			balanceCoins: clickerUser.balanceCoins,
-			earnPerTap: clickerUser.earnPerTap,
-			maxTaps: clickerUser.maxTaps,
-			earnPassivePerHour: clickerUser.earnPassivePerHour,
-		};
+		this.updateItemSemaphore = new Semaphore(1);
 	}
 
 	async sync() {
@@ -42,41 +36,6 @@ export class Hamster {
 		this.setUserData(clickerUser);
 
 		this.synced = true;
-	}
-
-	private setUpgrades(upgradesForBuy: UpgradeResponse[]) {
-		const newUpgrades: Upgrade[] = upgradesForBuy.map((upgrade) => {
-			return {
-				id: upgrade.id,
-				isAvailable: upgrade.isAvailable,
-				isExpired: upgrade.isExpired,
-				cooldownSeconds: upgrade.cooldownSeconds || 0,
-				cooldownEnds: upgrade.cooldownSeconds
-					? addSecondsToDate(upgrade.cooldownSeconds)
-					: null,
-				name: upgrade.name,
-				price: upgrade.price,
-				currentProfitPerHour: upgrade.currentProfitPerHour,
-				profitPerHour: upgrade.profitPerHour,
-				profitPerHourDelta: upgrade.profitPerHourDelta,
-				section: upgrade.section,
-				ratio: upgrade.price / upgrade.profitPerHourDelta,
-			};
-		});
-
-		newUpgrades.sort((a, b) => a.ratio - b.ratio);
-
-		this.sortedUpgrades = newUpgrades;
-		const upgradeItem = this.getFirstUpgradeable(this.sortedUpgrades);
-
-		writeObjectToFile(
-			{
-				lastUpdateDate: new Date(),
-				upgradeItem,
-				upgrades: this.sortedUpgrades,
-			},
-			"upgrades.json"
-		);
 	}
 
 	async fetchUpgrades() {
@@ -105,107 +64,141 @@ export class Hamster {
 	}
 
 	private async upgradeItem(item: Upgrade) {
-		return await hamsterAxios
-			.post(ENDPOINT.UPGRADE, {
-				timestamp: Date.now(),
-				upgradeId: item.id,
-			})
-			.then((data) => {
-				const { upgradesForBuy, clickerUser } = data.data;
-				this.setUpgrades(upgradesForBuy);
-				this.setUserData(clickerUser);
+		await this.updateItemSemaphore.runExclusive(async () => {
+			logger.info({
+				source: "account.upgradeItems",
+				action: "upgrading",
+				upgrade: item,
 			});
+
+			await hamsterAxios
+				.post(ENDPOINT.UPGRADE, {
+					timestamp: Date.now(),
+					upgradeId: item.id,
+				})
+				.then((data) => {
+					const { upgradesForBuy, clickerUser } = data.data;
+					this.setUpgrades(upgradesForBuy);
+					this.setUserData(clickerUser);
+				});
+
+			await sleep(1_000);
+		});
 	}
 
-	private getFirstUpgradeable(upgrades: Upgrade[]) {
-		// find first available and profitable item
-		return upgrades.find(
+	private setUserData(clickerUser: any) {
+		this.userData = {
+			balanceCoins: clickerUser.balanceCoins,
+			earnPerTap: clickerUser.earnPerTap,
+			maxTaps: clickerUser.maxTaps,
+			earnPassivePerHour: clickerUser.earnPassivePerHour,
+		};
+	}
+
+	private setUpgrades(upgradesForBuy: UpgradeResponse[]) {
+		let newUpgrades: Upgrade[] = upgradesForBuy.map((upgrade) => {
+			return {
+				id: upgrade.id,
+				isAvailable: upgrade.isAvailable,
+				isExpired: upgrade.isExpired,
+				cooldownSeconds: upgrade.cooldownSeconds || 0,
+				cooldownEnds: upgrade.cooldownSeconds
+					? addSecondsToDate(upgrade.cooldownSeconds)
+					: null,
+				name: upgrade.name,
+				price: upgrade.price,
+				currentProfitPerHour: upgrade.currentProfitPerHour,
+				profitPerHour: upgrade.profitPerHour,
+				profitPerHourDelta: upgrade.profitPerHourDelta,
+				section: upgrade.section,
+				ratio: upgrade.price / upgrade.profitPerHourDelta,
+			};
+		});
+
+		newUpgrades = newUpgrades.filter(
 			(upgrade) =>
-				upgrade.price > 0 &&
 				upgrade.profitPerHourDelta > 0 &&
 				upgrade.isAvailable &&
 				!upgrade.isExpired
 		);
+
+		newUpgrades.sort((a, b) => a.ratio - b.ratio);
+
+		this.sortedUpgrades = newUpgrades;
+		const upgradeItems = this.getUpgradeableItems(this.sortedUpgrades);
+
+		writeObjectToFile(
+			{
+				lastUpdateDate: new Date(),
+				upgradeItems: upgradeItems,
+				upgrades: this.sortedUpgrades,
+			},
+			"upgrades.json"
+		);
+	}
+
+	private getUpgradeableItems(upgrades: Upgrade[]) {
+		// find first available and profitable item
+		let tempBalanceCoins = this.userData.balanceCoins;
+		let tempUpgrades = [...upgrades];
+		const upgradeAbleItems = [];
+
+		while (tempUpgrades.length) {
+			const upgrade = tempUpgrades.find((upgrade) => {
+				let found =
+					upgrade.profitPerHourDelta > 0 &&
+					upgrade.isAvailable &&
+					!upgrade.isExpired;
+
+				if (found && upgrade.cooldownEnds) {
+					const remainCooldownMs = upgrade.cooldownEnds.getTime() - Date.now();
+					found = remainCooldownMs < SH_INTERVAL.HAMSTER.UPGRADES * 0.9;
+				}
+
+				return found;
+			});
+
+			if (!upgrade) break;
+			if (tempBalanceCoins - upgrade.price < 0) break;
+
+			upgradeAbleItems.push(upgrade);
+			tempUpgrades = tempUpgrades.filter((a) => a.id !== upgrade.id);
+			tempBalanceCoins -= upgrade.price;
+		}
+
+		return upgradeAbleItems;
 	}
 
 	async upgradeItems() {
-		if (!this.synced || this.isUpgrading) {
-			return;
-		}
-
-		this.isUpgrading = true;
-
-		while (true) {
-			const upgradeItem = this.getFirstUpgradeable(this.sortedUpgrades);
-
-			if (upgradeItem) {
-				try {
-					// if optimal profitable item costs highest or on cooldown, just wait them.
-					if (upgradeItem.cooldownEnds) {
-						if (upgradeItem.cooldownEnds.getTime() <= Date.now() + 2 * HOUR) {
-							logger.info({
-								source: "account.upgradeItems",
-								action: "waiting for cooldown",
-								upgrade: upgradeItem,
-							});
-							await sleep(
-								upgradeItem.cooldownEnds.getTime() - Date.now() + 10 * SECOND
-							);
-						} else {
-							break;
-						}
-					}
-
-					if (upgradeItem.price > this.userData.balanceCoins) {
-						const needCoins = upgradeItem.price - this.userData.balanceCoins;
-						const waitHours = needCoins / this.userData.earnPassivePerHour;
-						const waitingMillis = waitHours * HOUR;
-
-						if (waitHours <= 2) {
-							logger.info({
-								source: "account.upgradeItems",
-								action: "waiting for coins",
-								upgrade: upgradeItem,
-								needCoins,
-								endsUp: new Date(Date.now() + waitingMillis + 10 * SECOND),
-							});
-
-							await sleep(waitingMillis);
-						} else {
-							break;
-						}
-					}
-
-					await this.upgradeItem(upgradeItem);
-
+		const upgradeableItems = this.getUpgradeableItems(this.sortedUpgrades);
+		const promises = upgradeableItems.map(async (upgrade) => {
+			try {
+				// if optimal profitable item on cooldown, just wait it.
+				if (upgrade.cooldownEnds) {
 					logger.info({
 						source: "account.upgradeItems",
-						action: "upgrading",
-						upgrade: upgradeItem,
+						action: "waiting for cooldown",
+						upgrade: upgrade,
 					});
-				} catch (err) {
-					logger.error({
-						source: "account.upgradeItems",
-						message: err.message,
-						upgrade: upgradeItem,
-					});
-					await sleep(3000);
-				} finally {
-					await sleep(3000);
+
+					await sleep(
+						upgrade.cooldownEnds.getTime() - Date.now() + 10 * SECOND
+					);
+
+					upgrade.cooldownSeconds = 0;
+					upgrade.cooldownEnds = null;
 				}
-			} else {
-				logger.info({
+
+				await this.upgradeItem(upgrade);
+			} catch (err) {
+				logger.error({
 					source: "account.upgradeItems",
-					message: "Nothing to update",
-					balance: this.userData.balanceCoins,
-					profitPerHour: this.userData.earnPassivePerHour,
+					message: err.message,
+					upgrade: upgrade,
 				});
-
-				this.isUpgrading = false;
-				return;
 			}
-		}
+		});
 
-		this.isUpgrading = false;
+		Promise.all(promises);
 	}
 }
