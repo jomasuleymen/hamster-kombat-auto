@@ -196,8 +196,9 @@ export class Hamster {
 		writeObjectToFile(
 			{
 				lastUpdateDate: new Date(),
-				upgradeableItems,
+				userData: this.userData,
 				expensesOnQueue: this.expensesOnQueue,
+				upgradeableItems,
 				upgrades: this.sortedUpgrades,
 			},
 			"upgrades.json"
