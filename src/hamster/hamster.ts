@@ -173,7 +173,7 @@ export class Hamster {
 						}
 					}
 
-					this.upgradeItem(upgradeItem);
+					await this.upgradeItem(upgradeItem);
 
 					logger.info({
 						source: "account.upgradeItems",
