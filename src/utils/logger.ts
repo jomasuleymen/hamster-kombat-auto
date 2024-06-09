@@ -14,7 +14,7 @@ export const logger = winston.createLogger({
 	level: "info",
 	format: winston.format.combine(
 		winston.format.timestamp({
-			format: () => new Date().toLocaleString(),
+			format: () => new Date().toLocaleString("ru"),
 		}),
 		winston.format.json({ space: 2 })
 	),
