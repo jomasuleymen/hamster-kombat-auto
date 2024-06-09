@@ -67,8 +67,16 @@ export class Hamster {
 		newUpgrades.sort((a, b) => a.ratio - b.ratio);
 
 		this.sortedUpgrades = newUpgrades;
+		const upgradeItem = this.getFirstUpgradeable(this.sortedUpgrades);
 
-		writeObjectToFile(this.sortedUpgrades, "upgrades.json");
+		writeObjectToFile(
+			{
+				lastUpdateDate: new Date().toLocaleString("ru"),
+				upgradeItem,
+				upgrades: this.sortedUpgrades,
+			},
+			"upgrades.json"
+		);
 	}
 
 	async fetchUpgrades() {
@@ -109,23 +117,26 @@ export class Hamster {
 			});
 	}
 
+	private getFirstUpgradeable(upgrades: Upgrade[]) {
+		// find first available and profitable item
+		return upgrades.find(
+			(upgrade) =>
+				upgrade.price > 0 &&
+				upgrade.profitPerHourDelta > 0 &&
+				upgrade.isAvailable &&
+				!upgrade.isExpired
+		);
+	}
+
 	async upgradeItems() {
 		if (!this.synced || this.isUpgrading) {
 			return;
 		}
 
 		this.isUpgrading = true;
+		const upgradeItem = this.getFirstUpgradeable(this.sortedUpgrades);
 
 		while (true) {
-			// find first available and profitable item
-			const upgradeItem = this.sortedUpgrades.find(
-				(upgrade) =>
-					upgrade.price > 0 &&
-					upgrade.profitPerHourDelta > 0 &&
-					upgrade.isAvailable &&
-					!upgrade.isExpired
-			);
-
 			if (upgradeItem) {
 				try {
 					// if optimal profitable item costs highest or on cooldown, just wait them.
