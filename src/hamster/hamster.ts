@@ -140,18 +140,17 @@ export class Hamster {
 			if (upgradeItem) {
 				try {
 					// if optimal profitable item costs highest or on cooldown, just wait them.
-					if (
-						upgradeItem.cooldownEnds &&
-						upgradeItem.cooldownEnds.getTime() <= Date.now() + 2 * HOUR
-					) {
-						logger.info({
-							source: "account.upgradeItems",
-							action: "waiting for cooldown",
-							upgrade: upgradeItem,
-						});
-						await sleep(upgradeItem.cooldownEnds.getTime() - Date.now());
-					} else {
-						break;
+					if (upgradeItem.cooldownEnds) {
+						if (upgradeItem.cooldownEnds.getTime() <= Date.now() + 2 * HOUR) {
+							logger.info({
+								source: "account.upgradeItems",
+								action: "waiting for cooldown",
+								upgrade: upgradeItem,
+							});
+							await sleep(upgradeItem.cooldownEnds.getTime() - Date.now());
+						} else {
+							break;
+						}
 					}
 
 					if (upgradeItem.price > this.userData.balanceCoins) {
