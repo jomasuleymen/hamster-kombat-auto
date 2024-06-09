@@ -13,7 +13,9 @@ class ActionFilterTransport extends winston.transports.File {
 export const logger = winston.createLogger({
 	level: "info",
 	format: winston.format.combine(
-		winston.format.timestamp(),
+		winston.format.timestamp({
+			format: () => new Date().toLocaleString(),
+		}),
 		winston.format.json({ space: 2 })
 	),
 	transports: [
