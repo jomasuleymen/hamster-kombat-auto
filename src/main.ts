@@ -7,7 +7,7 @@ const main = async () => {
 		return this.toLocaleString("ru") + " - " + process.env.TZ;
 	};
 
-	Date.prototype.toLocaleString = function () {
+	Date.prototype.toString = function () {
 		return this.toLocaleString("ru") + " - " + process.env.TZ;
 	};
 

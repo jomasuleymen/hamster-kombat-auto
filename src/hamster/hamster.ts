@@ -71,7 +71,7 @@ export class Hamster {
 
 		writeObjectToFile(
 			{
-				lastUpdateDate: new Date().toLocaleString(),
+				lastUpdateDate: new Date(),
 				upgradeItem,
 				upgrades: this.sortedUpgrades,
 			},
