@@ -13,6 +13,7 @@ export class Hamster {
 	private userData: HamsterUserData;
 	private sortedUpgrades: Upgrade[];
 	private updateItemSemaphore: Semaphore;
+	private expensesOnQueue: number;
 
 	constructor() {
 		this.sortedUpgrades = [];
@@ -25,6 +26,7 @@ export class Hamster {
 		};
 
 		this.updateItemSemaphore = new Semaphore(1);
+		this.expensesOnQueue = 0;
 	}
 
 	async sync() {
@@ -70,9 +72,11 @@ export class Hamster {
 				action: "upgrading",
 				upgrade: item,
 			});
+			
+			this.expensesOnQueue -= item.price;
 
 			await hamsterAxios
-				.post(ENDPOINT.UPGRADE, {
+			.post(ENDPOINT.UPGRADE, {
 					timestamp: Date.now(),
 					upgradeId: item.id,
 				})
@@ -139,11 +143,12 @@ export class Hamster {
 
 	private getUpgradeableItems(upgrades: Upgrade[]) {
 		// find first available and profitable item
-		let tempBalanceCoins = this.userData.balanceCoins;
 		let tempUpgrades = [...upgrades];
 		const upgradeAbleItems = [];
 
 		while (tempUpgrades.length) {
+			let remainBalanceCoins =
+				this.userData.balanceCoins - this.expensesOnQueue;
 			const upgrade = tempUpgrades.find((upgrade) => {
 				let found =
 					upgrade.profitPerHourDelta > 0 &&
@@ -159,11 +164,11 @@ export class Hamster {
 			});
 
 			if (!upgrade) break;
-			if (tempBalanceCoins - upgrade.price < 0) break;
+			if (remainBalanceCoins - upgrade.price < 0) break;
 
 			upgradeAbleItems.push(upgrade);
 			tempUpgrades = tempUpgrades.filter((a) => a.id !== upgrade.id);
-			tempBalanceCoins -= upgrade.price;
+			this.expensesOnQueue += upgrade.price;
 		}
 
 		return upgradeAbleItems;
