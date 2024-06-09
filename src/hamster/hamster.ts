@@ -72,11 +72,11 @@ export class Hamster {
 				action: "upgrading",
 				upgrade: item,
 			});
-			
+
 			this.expensesOnQueue -= item.price;
 
 			await hamsterAxios
-			.post(ENDPOINT.UPGRADE, {
+				.post(ENDPOINT.UPGRADE, {
 					timestamp: Date.now(),
 					upgradeId: item.id,
 				})
@@ -127,18 +127,7 @@ export class Hamster {
 		);
 
 		newUpgrades.sort((a, b) => a.ratio - b.ratio);
-
 		this.sortedUpgrades = newUpgrades;
-		const upgradeItems = this.getUpgradeableItems(this.sortedUpgrades);
-
-		writeObjectToFile(
-			{
-				lastUpdateDate: new Date(),
-				upgradeItems: upgradeItems,
-				upgrades: this.sortedUpgrades,
-			},
-			"upgrades.json"
-		);
 	}
 
 	private getUpgradeableItems(upgrades: Upgrade[]) {
@@ -203,6 +192,16 @@ export class Hamster {
 				});
 			}
 		});
+
+		writeObjectToFile(
+			{
+				lastUpdateDate: new Date(),
+				upgradeableItems,
+				expensesOnQueue: this.expensesOnQueue,
+				upgrades: this.sortedUpgrades,
+			},
+			"upgrades.json"
+		);
 
 		Promise.all(promises);
 	}
