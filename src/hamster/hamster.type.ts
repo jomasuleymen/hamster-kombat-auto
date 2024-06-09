@@ -22,7 +22,7 @@ export interface Upgrade {
 	id: string;
 	isAvailable: boolean;
 	cooldownSeconds: number;
-	cooldownEnds: number | null;
+	cooldownEnds: Date | null;
 	isExpired: boolean;
 	name: string;
 	price: number;

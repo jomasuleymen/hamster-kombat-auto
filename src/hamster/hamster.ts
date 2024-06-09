@@ -3,14 +3,19 @@ import hamsterAxios from "src/utils/axios.instance";
 import { writeObjectToFile } from "src/utils/file.util";
 import { logger } from "src/utils/logger";
 import { addSecondsToDate, sleep } from "src/utils/time.util";
+import { HOUR } from "time-constants";
 import { HamsterUserData, Upgrade, UpgradeResponse } from "./hamster.type";
 
 export class Hamster {
-	userData: HamsterUserData;
-	sortedUpgrades: Upgrade[];
+	private synced: boolean;
+	private isUpgrading: boolean;
+
+	private userData: HamsterUserData;
+	private sortedUpgrades: Upgrade[];
 
 	constructor() {
 		this.sortedUpgrades = [];
+		this.synced = false;
 		this.userData = {
 			balanceCoins: 0,
 			earnPerTap: 0,
@@ -35,6 +40,8 @@ export class Hamster {
 
 		const { clickerUser } = data;
 		this.setUserData(clickerUser);
+
+		this.synced = true;
 	}
 
 	private setUpgrades(upgradesForBuy: UpgradeResponse[]) {
@@ -45,7 +52,7 @@ export class Hamster {
 				isExpired: upgrade.isExpired,
 				cooldownSeconds: upgrade.cooldownSeconds || 0,
 				cooldownEnds: upgrade.cooldownSeconds
-					? addSecondsToDate(upgrade.cooldownSeconds).getTime()
+					? addSecondsToDate(upgrade.cooldownSeconds)
 					: null,
 				name: upgrade.name,
 				price: upgrade.price,
@@ -76,7 +83,7 @@ export class Hamster {
 	}
 
 	async completeTap() {
-		if (!this.userData || !this.userData.maxTaps || !this.userData.earnPerTap) {
+		if (!this.synced) {
 			return;
 		}
 
@@ -103,6 +110,12 @@ export class Hamster {
 	}
 
 	async upgradeItems() {
+		if (!this.synced || this.isUpgrading) {
+			return;
+		}
+
+		this.isUpgrading = true;
+
 		while (true) {
 			// find first available and profitable item
 			const upgradeItem = this.sortedUpgrades.find(
@@ -114,14 +127,42 @@ export class Hamster {
 			);
 
 			if (upgradeItem) {
-				// if optimal profitable item costs highest or on cooldown, just wait them.
-				if (
-					upgradeItem.price > this.userData.balanceCoins ||
-					(upgradeItem.cooldownEnds && upgradeItem.cooldownEnds > Date.now())
-				)
-					return;
-
 				try {
+					// if optimal profitable item costs highest or on cooldown, just wait them.
+					if (
+						upgradeItem.cooldownEnds &&
+						upgradeItem.cooldownEnds.getTime() <= Date.now() + 2 * HOUR
+					) {
+						logger.info({
+							source: "account.upgradeItems",
+							action: "waiting for cooldown",
+							upgrade: upgradeItem,
+						});
+						await sleep(upgradeItem.cooldownEnds.getTime() - Date.now());
+					} else {
+						break;
+					}
+
+					if (upgradeItem.price > this.userData.balanceCoins) {
+						const needCoins = upgradeItem.price - this.userData.balanceCoins;
+						const waitHours = needCoins / this.userData.earnPassivePerHour;
+						const waitingMillis = waitHours * HOUR;
+
+						if (waitHours <= 2) {
+							logger.info({
+								source: "account.upgradeItems",
+								action: "waiting for coins",
+								upgrade: upgradeItem,
+								needCoins,
+								endsUp: new Date(Date.now() + waitingMillis),
+							});
+
+							await sleep(waitingMillis);
+						} else {
+							break;
+						}
+					}
+
 					this.upgradeItem(upgradeItem);
 
 					logger.info({
@@ -150,8 +191,11 @@ export class Hamster {
 					profitPerHour: this.userData.earnPassivePerHour,
 				});
 
+				this.isUpgrading = false;
 				return;
 			}
 		}
+
+		this.isUpgrading = false;
 	}
 }

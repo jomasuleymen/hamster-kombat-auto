@@ -12,8 +12,10 @@
 	"dependencies": {
 		"@types/jest": "^29.5.12",
 		"@types/node": "^20.14.2",
+		"@types/time-constants": "^1.0.2",
 		"axios": "^1.7.2",
 		"dotenv": "^16.4.5",
+		"time-constants": "^1.0.3",
 		"toad-scheduler": "^3.0.1",
 		"tsc": "^2.0.4",
 		"tsconfig-paths": "^4.2.0",
