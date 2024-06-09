@@ -3,7 +3,7 @@ import hamsterAxios from "src/utils/axios.instance";
 import { writeObjectToFile } from "src/utils/file.util";
 import { logger } from "src/utils/logger";
 import { addSecondsToDate, sleep } from "src/utils/time.util";
-import { HOUR } from "time-constants";
+import { HOUR, SECOND } from "time-constants";
 import { HamsterUserData, Upgrade, UpgradeResponse } from "./hamster.type";
 
 export class Hamster {
@@ -147,7 +147,9 @@ export class Hamster {
 								action: "waiting for cooldown",
 								upgrade: upgradeItem,
 							});
-							await sleep(upgradeItem.cooldownEnds.getTime() - Date.now());
+							await sleep(
+								upgradeItem.cooldownEnds.getTime() - Date.now() + 10 * SECOND
+							);
 						} else {
 							break;
 						}
@@ -164,7 +166,7 @@ export class Hamster {
 								action: "waiting for coins",
 								upgrade: upgradeItem,
 								needCoins,
-								endsUp: new Date(Date.now() + waitingMillis),
+								endsUp: new Date(Date.now() + waitingMillis + 10 * SECOND),
 							});
 
 							await sleep(waitingMillis);
