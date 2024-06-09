@@ -1,8 +1,9 @@
 import { ENDPOINT, ERR } from "src/constants/hamster-api.constant";
 import hamsterAxios from "src/utils/axios.instance";
+import { writeObjectToFile } from "src/utils/file.util";
 import { logger } from "src/utils/logger";
-import { sleep } from "src/utils/time.util";
-import { HamsterUserData, Upgrade } from "./hamster.type";
+import { addSecondsToDate, sleep } from "src/utils/time.util";
+import { HamsterUserData, Upgrade, UpgradeResponse } from "./hamster.type";
 
 export class Hamster {
 	userData: HamsterUserData;
@@ -36,13 +37,16 @@ export class Hamster {
 		this.setUserData(clickerUser);
 	}
 
-	private setUpgrades(upgradesForBuy: any) {
-		const newUpgrades: Upgrade[] = upgradesForBuy.map((upgrade: any) => {
+	private setUpgrades(upgradesForBuy: UpgradeResponse[]) {
+		const newUpgrades: Upgrade[] = upgradesForBuy.map((upgrade) => {
 			return {
 				id: upgrade.id,
 				isAvailable: upgrade.isAvailable,
 				isExpired: upgrade.isExpired,
 				cooldownSeconds: upgrade.cooldownSeconds || 0,
+				cooldownEnds: upgrade.cooldownSeconds
+					? addSecondsToDate(upgrade.cooldownSeconds).getTime()
+					: null,
 				name: upgrade.name,
 				price: upgrade.price,
 				currentProfitPerHour: upgrade.currentProfitPerHour,
@@ -53,9 +57,11 @@ export class Hamster {
 			};
 		});
 
-		newUpgrades.sort((a, b) => a.ration - b.ration);
+		newUpgrades.sort((a, b) => a.ratio - b.ratio);
 
 		this.sortedUpgrades = newUpgrades;
+
+		writeObjectToFile(this.sortedUpgrades, "upgrades.json");
 	}
 
 	async fetchUpgrades() {
@@ -90,8 +96,6 @@ export class Hamster {
 				upgradeId: item.id,
 			})
 			.then((data) => {
-				this.userData.balanceCoins -= item.price;
-
 				const { upgradesForBuy, clickerUser } = data.data;
 				this.setUpgrades(upgradesForBuy);
 				this.setUserData(clickerUser);
@@ -113,7 +117,7 @@ export class Hamster {
 				// if optimal profitable item costs highest or on cooldown, just wait them.
 				if (
 					upgradeItem.price > this.userData.balanceCoins ||
-					upgradeItem.cooldownSeconds > 0
+					(upgradeItem.cooldownEnds && upgradeItem.cooldownEnds > Date.now())
 				)
 					return;
 
