@@ -1,4 +1,4 @@
-import { ENDPOINT, ERR } from "src/constants/hamster-api.constant";
+import { ENDPOINT } from "src/constants/hamster-api.constant";
 import hamsterAxios from "src/utils/axios.instance";
 import { writeObjectToFile } from "src/utils/file.util";
 import { logger } from "src/utils/logger";
@@ -134,9 +134,10 @@ export class Hamster {
 		}
 
 		this.isUpgrading = true;
-		const upgradeItem = this.getFirstUpgradeable(this.sortedUpgrades);
 
 		while (true) {
+			const upgradeItem = this.getFirstUpgradeable(this.sortedUpgrades);
+
 			if (upgradeItem) {
 				try {
 					// if optimal profitable item costs highest or on cooldown, just wait them.
@@ -183,15 +184,12 @@ export class Hamster {
 						upgrade: upgradeItem,
 					});
 				} catch (err) {
-					if (err.response?.data.message !== ERR.INSUFFICIENT_FUNDS) {
-						upgradeItem.isAvailable = false;
-					}
-
 					logger.error({
 						source: "account.upgradeItems",
 						message: err.message,
 						upgrade: upgradeItem,
 					});
+					await sleep(3000);
 				} finally {
 					await sleep(3000);
 				}
