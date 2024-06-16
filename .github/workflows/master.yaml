@@ -11,14 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: executing remote ssh commands using password
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
           script_stop: true
           script: |
-            eval "$(ssh-agent -s)"
-            ssh-add ~/.ssh/id_rsa
             cd /root/projects/hamster-kombat-auto
             bash deploy.sh
