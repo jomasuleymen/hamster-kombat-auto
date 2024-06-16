@@ -1,0 +1,39 @@
+name: Deploy Node.js app
+
+on:
+  push:
+    branches:
+      - master  # Trigger deployment on push to main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20.14.0'  # Use the appropriate Node.js version
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Deploy to server
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}  # Add your private key to GitHub secrets
+        SSH_HOST: ${{ secrets.SSH_HOST }}  # Add your server host to GitHub secrets
+        SSH_USERNAME: ${{ secrets.SSH_USERNAME }}  # Add your server username to GitHub secrets
+      run: |
+        echo "$SSH_PRIVATE_KEY" > private_key
+        chmod 600 private_key
+
+        scp -i private_key -o StrictHostKeyChecking=no -r . $SSH_USERNAME@$SSH_HOST:/home/$SSH_USERNAME/app
+
+        ssh -i private_key -o StrictHoshamster-kombat-autotKeyChecking=no $SSH_USERNAME@$SSH_HOST << 'EOF'
+          cd /$SSH_USERNAME/projects/hamster-kombat-auto
+          npm install
+          pm2 reload ecosystem.config.json --env production  # Assuming you have an ecosystem.config.json file
+        EOF
