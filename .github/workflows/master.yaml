@@ -21,4 +21,4 @@ jobs:
           script_stop: true
           script: |
             cd /root/projects/hamster-kombat-auto
-            bash deploy.sh
+            sh deploy.sh
