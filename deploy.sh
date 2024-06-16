@@ -1,5 +1,4 @@
 # Download dependencies
-log "Download dependencies"
 npm ci
 
 # Restart app
