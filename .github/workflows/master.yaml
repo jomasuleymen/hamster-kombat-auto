@@ -22,4 +22,4 @@ jobs:
             cd /root/projects/hamster-kombat-auto
             git fetch
             git pull
-            sh deploy.sh
+            bash deploy.sh
