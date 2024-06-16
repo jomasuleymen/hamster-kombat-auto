@@ -16,9 +16,9 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          password: ${{ secrets.SSH_PASSWORD }}
           port: 22
           script_stop: true
           script: |
             cd /root/projects/hamster-kombat-auto
+            git fetch
             sh deploy.sh
