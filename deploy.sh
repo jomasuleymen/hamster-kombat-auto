@@ -1,3 +1,7 @@
+
+git fetch
+git pull
+
 # Download dependencies
 npm ci
 

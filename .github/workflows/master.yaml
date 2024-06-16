@@ -10,7 +10,7 @@ jobs:
     name: Deploy to FACE
     runs-on: ubuntu-latest
     steps:
-      - name: executing remote ssh commands using password
+      - name: deploying
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -19,7 +19,7 @@ jobs:
           port: 22
           script_stop: true
           script: |
+            export NVM_DIR=~/.nvm
+            source ~/.nvm/nvm.sh
             cd /root/projects/hamster-kombat-auto
-            git fetch
-            git pull
             bash deploy.sh
