@@ -5,7 +5,7 @@ export interface HamsterUserData {
 	earnPassivePerHour: number;
 }
 
-export interface UpgradeResponse {
+export interface UpgradeReqResponse {
 	id: string;
 	isAvailable: boolean;
 	cooldownSeconds: number;

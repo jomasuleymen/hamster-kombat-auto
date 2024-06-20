@@ -1,11 +1,11 @@
-import { Semaphore } from "async-mutex";
-import { ENDPOINT, SH_INTERVAL } from "src/constants/hamster-api.constant";
-import hamsterAxios from "src/utils/axios.instance";
-import { writeObjectToFile } from "src/utils/file.util";
-import { logger } from "src/utils/logger";
-import { addSecondsToDate, sleep } from "src/utils/time.util";
-import { SECOND } from "time-constants";
-import { HamsterUserData, Upgrade, UpgradeResponse } from "./hamster.type";
+import { Semaphore } from 'async-mutex';
+import { ENDPOINT, SH_INTERVAL } from 'src/constants/hamster-api.constant';
+import hamsterAxios from 'src/utils/axios.instance';
+import { writeObjectToFile } from 'src/utils/file.util';
+import { logger } from 'src/utils/logger';
+import { addSecondsToDate, sleep } from 'src/utils/time.util';
+import { MILLISECONDS_PER_SECOND, SECOND } from 'time-constants';
+import { HamsterUserData, Upgrade, UpgradeReqResponse } from './hamster.type';
 
 export class Hamster {
 	private synced: boolean;
@@ -14,6 +14,7 @@ export class Hamster {
 	private sortedUpgrades: Upgrade[];
 	private updateItemSemaphore: Semaphore;
 	private expensesOnQueue: number;
+	private nextCipherAvailableDate: Date;
 
 	constructor() {
 		this.sortedUpgrades = [];
@@ -27,6 +28,7 @@ export class Hamster {
 
 		this.updateItemSemaphore = new Semaphore(1);
 		this.expensesOnQueue = 0;
+		this.nextCipherAvailableDate = new Date();
 	}
 
 	async sync() {
@@ -65,11 +67,26 @@ export class Hamster {
 			.then((data) => data.data);
 	}
 
+	async claimDailyCipher() {
+		return await hamsterAxios
+			.post(ENDPOINT.CLAIM_CIPHER, {
+				cipher: 'FORK',
+			})
+			.then((data) => {
+				const { remainSeconds } = data.data || {};
+				if (remainSeconds) {
+					this.nextCipherAvailableDate = new Date(
+						Date.now() + (remainSeconds + 10) * MILLISECONDS_PER_SECOND
+					);
+				}
+			});
+	}
+
 	private async upgradeItem(item: Upgrade) {
 		await this.updateItemSemaphore.runExclusive(async () => {
 			logger.info({
-				source: "account.upgradeItems",
-				action: "upgrading",
+				source: 'account.upgradeItems',
+				action: 'upgrading',
 				upgrade: item,
 			});
 
@@ -99,7 +116,7 @@ export class Hamster {
 		};
 	}
 
-	private setUpgrades(upgradesForBuy: UpgradeResponse[]) {
+	private setUpgrades(upgradesForBuy: UpgradeReqResponse[]) {
 		let newUpgrades: Upgrade[] = upgradesForBuy.map((upgrade) => {
 			return {
 				id: upgrade.id,
@@ -170,8 +187,8 @@ export class Hamster {
 				// if optimal profitable item on cooldown, just wait it.
 				if (upgrade.cooldownEnds) {
 					logger.info({
-						source: "account.upgradeItems",
-						action: "waiting for cooldown",
+						source: 'account.upgradeItems',
+						action: 'waiting for cooldown',
 						upgrade: upgrade,
 					});
 
@@ -186,7 +203,7 @@ export class Hamster {
 				await this.upgradeItem(upgrade);
 			} catch (err) {
 				logger.error({
-					source: "account.upgradeItems",
+					source: 'account.upgradeItems',
 					message: err.message,
 					upgrade: upgrade,
 				});
@@ -201,7 +218,7 @@ export class Hamster {
 				upgradeableItems,
 				upgrades: this.sortedUpgrades,
 			},
-			"upgrades.json"
+			'upgrades.json'
 		);
 
 		Promise.all(promises);
