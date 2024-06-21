@@ -18,6 +18,7 @@
 		"dotenv": "^16.4.5",
 		"time-constants": "^1.0.3",
 		"toad-scheduler": "^3.0.1",
+		"ts-node": "^10.9.2",
 		"tsc": "^2.0.4",
 		"tsconfig-paths": "^4.2.0",
 		"typescript": "^5.4.5",

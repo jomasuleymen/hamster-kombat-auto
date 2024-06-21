@@ -4,16 +4,23 @@ import hamsterAxios from 'src/utils/axios.instance';
 import { writeObjectToFile } from 'src/utils/file.util';
 import { logger } from 'src/utils/logger';
 import { addSecondsToDate, sleep } from 'src/utils/time.util';
-import { MILLISECONDS_PER_SECOND, SECOND } from 'time-constants';
-import { HamsterUserData, Upgrade, UpgradeReqResponse } from './hamster.type';
+import { MILLISECONDS_PER_SECOND, MINUTE, SECOND } from 'time-constants';
+import {
+	DailyCipher,
+	HamsterUserData,
+	Upgrade,
+	UpgradeReqResponse,
+} from './hamster.type';
 
 export class Hamster {
 	private synced: boolean;
 
 	private userData: HamsterUserData;
 	private sortedUpgrades: Upgrade[];
-	private updateItemSemaphore: Semaphore;
+	private requestSemaphore: Semaphore;
+	private dailyCipher: DailyCipher;
 	private expensesOnQueue: number;
+	private lastSyncedTime: number;
 	private nextCipherAvailableDate: Date;
 
 	constructor() {
@@ -25,65 +32,131 @@ export class Hamster {
 			maxTaps: 0,
 			earnPassivePerHour: 0,
 		};
-
-		this.updateItemSemaphore = new Semaphore(1);
+		this.dailyCipher = {
+			cipher: '',
+			isClaimed: true,
+			remainSeconds: 0,
+		};
+		this.requestSemaphore = new Semaphore(1);
 		this.expensesOnQueue = 0;
 		this.nextCipherAvailableDate = new Date();
+		this.lastSyncedTime = 0;
+	}
+
+	private async runExclusive(callback: () => any) {
+		return await this.requestSemaphore.runExclusive(async () => {
+			await sleep(1_000);
+			return await callback();
+		});
 	}
 
 	async sync() {
-		const data = await hamsterAxios.post(ENDPOINT.SYNC).then((data) => {
-			return data.data;
-		});
+		await this.runExclusive(async () => {
+			if (Date.now() - this.lastSyncedTime <= MINUTE) {
+				return;
+			}
 
-		const { clickerUser } = data;
-		this.setUserData(clickerUser);
-
-		this.synced = true;
-	}
-
-	async fetchUpgrades() {
-		const data = await hamsterAxios
-			.post(ENDPOINT.UPGRADES_FOR_BUY)
-			.then((data) => {
+			const data = await hamsterAxios.post(ENDPOINT.SYNC).then((data) => {
 				return data.data;
 			});
 
-		const { upgradesForBuy } = data;
-		this.setUpgrades(upgradesForBuy);
+			const { clickerUser } = data;
+			this.setUserData(clickerUser);
+
+			const config = await hamsterAxios.post(ENDPOINT.CONFIG).then((data) => {
+				return data.data;
+			});
+
+			const { dailyCipher } = config;
+			this.dailyCipher = {
+				cipher: dailyCipher.cipher,
+				isClaimed: dailyCipher.isClaimed,
+				remainSeconds: dailyCipher.remainSeconds,
+			};
+
+			this.synced = true;
+			this.lastSyncedTime = Date.now();
+		});
+	}
+
+	async fetchUpgrades() {
+		await this.runExclusive(async () => {
+			const data = await hamsterAxios
+				.post(ENDPOINT.UPGRADES_FOR_BUY)
+				.then((data) => {
+					return data.data;
+				});
+
+			const { upgradesForBuy } = data;
+			this.setUpgrades(upgradesForBuy);
+		});
 	}
 
 	async completeTap() {
-		if (!this.synced) {
-			return;
-		}
+		if (!this.synced) return;
 
-		return await hamsterAxios
-			.post(ENDPOINT.TAP, {
-				availableTaps: 0,
-				count: Math.floor(this.userData.maxTaps / this.userData.earnPerTap),
-				timestamp: Date.now(),
-			})
-			.then((data) => data.data);
+		await this.runExclusive(async () => {
+			return await hamsterAxios
+				.post(ENDPOINT.TAP, {
+					availableTaps: 0,
+					count: Math.floor(this.userData.maxTaps / this.userData.earnPerTap),
+					timestamp: Date.now(),
+				})
+				.then((data) => data.data);
+		});
+	}
+
+	private decodeCipher(cipher: string) {
+		const delimeter = '4';
+
+		try {
+			if (cipher.length <= 4) return atob(cipher);
+			if (cipher.charAt(3) == delimeter)
+				return atob(cipher.slice(0, 3) + cipher.slice(4));
+
+			return atob(cipher.replace(/4/g, ''));
+		} catch (_) {
+			return null;
+		}
 	}
 
 	async claimDailyCipher() {
-		return await hamsterAxios
-			.post(ENDPOINT.CLAIM_CIPHER, {
-				cipher: 'FORK',
-			})
-			.then((data) => {
-				const { remainSeconds } = data.data || {};
-				if (remainSeconds) {
-					this.nextCipherAvailableDate = new Date(
-						Date.now() + (remainSeconds + 10) * MILLISECONDS_PER_SECOND
-					);
-				}
-			});
+		if (!this.synced) return;
+		if (new Date() < this.nextCipherAvailableDate) return;
+		if (this.dailyCipher.isClaimed) {
+			this.nextCipherAvailableDate = new Date(
+				Date.now() +
+					(this.dailyCipher.remainSeconds + 10) * MILLISECONDS_PER_SECOND
+			);
+			return;
+		}
+
+		const cipher = this.decodeCipher(this.dailyCipher.cipher);
+		if (!cipher) return;
+
+		logger.info({
+			source: 'account.claimDailyCipher',
+			cipher,
+		});
+
+		return await this.runExclusive(async () => {
+			await hamsterAxios
+				.post(ENDPOINT.CLAIM_CIPHER, {
+					cipher,
+				})
+				.then((data) => {
+					const { remainSeconds } = data.data || {};
+					if (remainSeconds) {
+						this.nextCipherAvailableDate = new Date(
+							Date.now() + (remainSeconds + 10) * MILLISECONDS_PER_SECOND
+						);
+					}
+				});
+		});
 	}
 
 	private async upgradeItem(item: Upgrade) {
-		await this.updateItemSemaphore.runExclusive(async () => {
+		await this.runExclusive(async () => {
 			logger.info({
 				source: 'account.upgradeItems',
 				action: 'upgrading',
@@ -102,8 +175,6 @@ export class Hamster {
 					this.setUpgrades(upgradesForBuy);
 					this.setUserData(clickerUser);
 				});
-
-			await sleep(1_000);
 		});
 	}
 

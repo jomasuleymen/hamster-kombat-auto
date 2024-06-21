@@ -32,3 +32,9 @@ export interface Upgrade {
 	section: string;
 	ratio: number;
 }
+
+export interface DailyCipher {
+	cipher: string;
+	isClaimed: boolean;
+	remainSeconds: number;
+}
