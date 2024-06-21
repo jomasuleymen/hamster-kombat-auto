@@ -9,7 +9,9 @@ export const ERR = {
 
 export const ENDPOINT = {
 	SYNC: `${BASE_URL}/clicker/sync`,
+	CONFIG: `${BASE_URL}/clicker/config`,
 	TAP: `${BASE_URL}/clicker/tap`,
+	CLAIM_CIPHER: `${BASE_URL}/clicker/claim-daily-cipher`,
 	UPGRADE: `${BASE_URL}/clicker/buy-upgrade`,
 	UPGRADES_FOR_BUY: `${BASE_URL}/clicker/upgrades-for-buy`,
 };
@@ -18,6 +20,7 @@ export const SH_INTERVAL = {
 	HAMSTER: {
 		TAP: 25 * MINUTE,
 		UPGRADES: 1 * HOUR,
+		CLAIM_DAILY_CIPHER: 1 * HOUR,
 	},
 	ENV: {
 		AUTH_TOKEN: 30 * SECOND,

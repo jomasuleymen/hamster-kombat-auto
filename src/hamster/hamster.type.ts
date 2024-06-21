@@ -5,7 +5,7 @@ export interface HamsterUserData {
 	earnPassivePerHour: number;
 }
 
-export interface UpgradeResponse {
+export interface UpgradeReqResponse {
 	id: string;
 	isAvailable: boolean;
 	cooldownSeconds: number;
@@ -31,4 +31,10 @@ export interface Upgrade {
 	profitPerHourDelta: number;
 	section: string;
 	ratio: number;
+}
+
+export interface DailyCipher {
+	cipher: string;
+	isClaimed: boolean;
+	remainSeconds: number;
 }
