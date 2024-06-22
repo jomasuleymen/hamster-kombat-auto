@@ -219,11 +219,17 @@ export class Hamster {
 	}
 
 	private getUpgradeableItems(upgrades: Upgrade[]) {
-		// find first available and profitable item
+		const upgradeAbleItems: Upgrade[] = [];
 		let tempUpgrades = [...upgrades];
 		tempUpgrades.sort((a, b) => a.ratio - b.ratio);
 
-		const upgradeAbleItems = [];
+		const firstUpgradeable = tempUpgrades.find(
+			(upgrade) =>
+				upgrade.profitPerHourDelta > 0 &&
+				upgrade.isAvailable &&
+				!upgrade.isExpired
+		);
+		if (!firstUpgradeable) return upgradeAbleItems;
 
 		while (tempUpgrades.length) {
 			let remainBalanceCoins =
@@ -245,10 +251,7 @@ export class Hamster {
 			if (!upgrade) break;
 			if (remainBalanceCoins - upgrade.price < 0) break;
 
-			if (upgradeAbleItems.length > 0) {
-				const firstUpgrade = upgradeAbleItems[0];
-				if (upgrade.ratio > firstUpgrade.ratio * 1.30) break;
-			}
+			if (upgrade.ratio > firstUpgradeable.ratio * 1.3) break;
 
 			upgradeAbleItems.push(upgrade);
 			tempUpgrades = tempUpgrades.filter((a) => a.id !== upgrade.id);
