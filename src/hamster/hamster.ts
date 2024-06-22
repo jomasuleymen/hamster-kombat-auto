@@ -221,27 +221,34 @@ export class Hamster {
 	private getUpgradeableItems(upgrades: Upgrade[]) {
 		// find first available and profitable item
 		let tempUpgrades = [...upgrades];
+		tempUpgrades.sort((a, b) => a.ratio - b.ratio);
+
 		const upgradeAbleItems = [];
 
 		while (tempUpgrades.length) {
 			let remainBalanceCoins =
 				this.userData.balanceCoins - this.expensesOnQueue;
 			const upgrade = tempUpgrades.find((upgrade) => {
-				let found =
+				let isUpgradeable =
 					upgrade.profitPerHourDelta > 0 &&
 					upgrade.isAvailable &&
 					!upgrade.isExpired;
 
-				if (found && upgrade.cooldownEnds) {
+				if (isUpgradeable && upgrade.cooldownEnds) {
 					const remainCooldownMs = upgrade.cooldownEnds.getTime() - Date.now();
-					found = remainCooldownMs < SH_INTERVAL.HAMSTER.UPGRADES * 0.9;
+					isUpgradeable = remainCooldownMs < SH_INTERVAL.HAMSTER.UPGRADES * 0.9;
 				}
 
-				return found;
+				return isUpgradeable;
 			});
 
 			if (!upgrade) break;
 			if (remainBalanceCoins - upgrade.price < 0) break;
+
+			if (upgradeAbleItems.length > 0) {
+				const firstUpgrade = upgradeAbleItems[0];
+				if (upgrade.ratio > firstUpgrade.ratio * 1.30) break;
+			}
 
 			upgradeAbleItems.push(upgrade);
 			tempUpgrades = tempUpgrades.filter((a) => a.id !== upgrade.id);
