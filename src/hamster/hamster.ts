@@ -107,17 +107,36 @@ export class Hamster {
 	}
 
 	private decodeCipher(cipher: string) {
-		const delimeter = '4';
+		const alphanumericRegex = /^[A-Za-z0-9]$/;
 
-		try {
-			if (cipher.length <= 4) return atob(cipher);
-			if (cipher.charAt(3) == delimeter)
-				return atob(cipher.slice(0, 3) + cipher.slice(4));
+		for (let idx = -1; idx < cipher.length; idx++) {
+			try {
+				let tempCipher = cipher;
 
-			return atob(cipher.replace(/4/g, ''));
-		} catch (_) {
-			return null;
+				if (idx >= 0) {
+					const splitted = tempCipher.split('');
+					splitted.splice(idx, 1);
+					tempCipher = splitted.join('');
+				}
+
+				let decoded = atob(tempCipher).trim();
+				if (!decoded || !decoded.length) continue;
+
+				let isValid = true;
+				for (let i = 0; i < decoded.length; i++) {
+					const ch = decoded.charAt(i);
+					if (!ch || !alphanumericRegex.test(ch)) {
+						isValid = false;
+						break;
+					}
+				}
+				if (!isValid) continue;
+				
+				return decoded;
+			} catch (_) {}
 		}
+
+		return null;
 	}
 
 	async claimDailyCipher() {
@@ -132,7 +151,7 @@ export class Hamster {
 		}
 
 		const cipher = this.decodeCipher(this.dailyCipher.cipher);
-		if (!cipher) return;
+		if (!cipher || cipher.trim().length === 0) return;
 
 		logger.info({
 			source: 'account.claimDailyCipher',
