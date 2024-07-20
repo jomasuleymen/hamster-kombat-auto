@@ -18,11 +18,14 @@ export const logger = winston.createLogger({
 		}),
 		winston.format.json({ space: 2 })
 	),
+	rejectionHandlers: false,
+	exitOnError: false,
 	transports: [
 		new winston.transports.File({
 			dirname: "logs",
 			filename: "info.log",
 			level: "info",
+			
 		}),
 		new winston.transports.File({
 			dirname: "logs",

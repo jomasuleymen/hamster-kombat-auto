@@ -22,6 +22,7 @@ export class Hamster {
 	private expensesOnQueue: number;
 	private lastSyncedTime: number;
 	private nextCipherAvailableDate: Date;
+	private cipherData: Record<string, boolean>;
 
 	constructor() {
 		this.sortedUpgrades = [];
@@ -37,6 +38,7 @@ export class Hamster {
 			isClaimed: true,
 			remainSeconds: 0,
 		};
+		this.cipherData = {};
 		this.requestSemaphore = new Semaphore(1);
 		this.expensesOnQueue = 0;
 		this.nextCipherAvailableDate = new Date();
@@ -131,7 +133,10 @@ export class Hamster {
 					}
 				}
 				if (!isValid) continue;
-				
+				if (this.cipherData[decoded] !== undefined) continue;
+
+				this.cipherData[decoded] = true;
+
 				return decoded;
 			} catch (_) {}
 		}
@@ -150,18 +155,20 @@ export class Hamster {
 			return;
 		}
 
-		const cipher = this.decodeCipher(this.dailyCipher.cipher);
-		if (!cipher || cipher.trim().length === 0) return;
+		const decoded = this.decodeCipher(this.dailyCipher.cipher);
+		if (!decoded || decoded.trim().length === 0) {
+			return;
+		}
 
 		logger.info({
 			source: 'account.claimDailyCipher',
-			cipher,
+			cipher: decoded,
 		});
 
 		return await this.runExclusive(async () => {
 			await hamsterAxios
 				.post(ENDPOINT.CLAIM_CIPHER, {
-					cipher,
+					cipher: decoded,
 				})
 				.then((data) => {
 					const { remainSeconds } = data.data || {};
@@ -169,6 +176,7 @@ export class Hamster {
 						this.nextCipherAvailableDate = new Date(
 							Date.now() + (remainSeconds + 10) * MILLISECONDS_PER_SECOND
 						);
+						this.cipherData = {};
 					}
 				});
 		});
