@@ -278,7 +278,7 @@ export class Hamster {
 			if (!upgrade) break;
 			if (remainBalanceCoins - upgrade.price < 0) break;
 
-			if (upgrade.ratio > firstUpgradeable.ratio * 1.3) break;
+			if (upgrade.ratio >= 3500 && upgrade.ratio > firstUpgradeable.ratio * 1.3) break;
 
 			upgradeAbleItems.push(upgrade);
 			tempUpgrades = tempUpgrades.filter((a) => a.id !== upgrade.id);
