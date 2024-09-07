@@ -7,8 +7,7 @@ import { SimpleIntervalJob, Task } from 'toad-scheduler';
 async function upgraderAutomation(account: Hamster) {
 	const actions = [
 		account.sync.bind(account),
-		account.fetchUpgrades.bind(account),
-		account.upgradeItems.bind(account),
+		account.fetchUpgrades.bind(account)
 	];
 
 	for (let action of actions) {
