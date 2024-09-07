@@ -19,7 +19,7 @@ export const ENDPOINT = {
 export const SH_INTERVAL = {
 	HAMSTER: {
 		TAP: 20 * MINUTE,
-		UPGRADES: 5 * MINUTE,
+		UPGRADES: 45 * MINUTE,
 		CLAIM_DAILY_CIPHER: 1 * HOUR,
 	},
 	ENV: {
