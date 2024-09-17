@@ -115,6 +115,6 @@ function dailyCipherAutomationJob(account: Hamster) {
 export const hamsterJobs = () => {
 	const account = new Hamster();
 	return [
-		upgraderAutomationJob(account),
+	//	upgraderAutomationJob(account),
 	];
 };
